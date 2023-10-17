@@ -20,17 +20,22 @@ function App() {
   }, []);
 
   const getUsername = () => {
-      const username_generate = `user_${Math.random().toString(36).substring(2, 6)}`;
+    const previousUsername = localStorage.getItem("username");
+    if (previousUsername) {
+      setUsername(previousUsername)
+    } else {
+      const username_generate = `person_${Math.random().toString(36).substring(2, 6)}`;
       localStorage.setItem("username", username_generate);
-      console.log("username - " + username_generate)
       setUsername(username_generate)
+    }
+
   };
   //working
   const getMessages = async () => {
     const { data } = await supabase
       .from("messages")
       .select()
-      .order("timestamp", { ascending: false });
+      .order("timestamp", { ascending: true });
       console.log(data)
       setMessages(data)
     return data;
@@ -66,16 +71,15 @@ const userStatus = {
 
 roomOne.subscribe(async (status) => {
   if (status !== 'SUBSCRIBED') { return }
-
   const presenceTrackStatus = await roomOne.track(userStatus)
-  console.log(presenceTrackStatus , userStatus)
+ // console.log(presenceTrackStatus , userStatus)
 })
 
 // 
 const channel = supabase.channel('custom-channel')
 channel
   .on('presence', { event: 'sync' }, () => {
-    console.log('Synced presence state: ', channel.presenceState())
+   // console.log('Synced presence state: ', channel.presenceState())
   })
   .subscribe(async (status) => {
     if (status === 'SUBSCRIBED') {
@@ -83,7 +87,6 @@ channel
     }
   })
 //
-
 
 const createNewMessage = async (username, text) => {
   if (text) {
@@ -99,9 +102,18 @@ const createNewMessage = async (username, text) => {
     <div className="flex flex-col h-screen">
     <div className="flex-1 p-4 overflow-y-auto">
       {messages.map((message, index) => (
-        <div key={index} className="mb-4">
-          <div className="text-gray-600 m-2">{message.username}:{message.text}</div>
+        <div
+        key={index}
+        className={`mb-4 ${
+          message.username === username ? 'bg-green-200 border border-green-500' : 'bg-gray-200 border border-gray-500'
+        } rounded-lg p-2 max-w-2/3 self-${
+          message.username === username ? 'end' : 'start'
+        }`}
+      >
+        <div className="text-gray-600 m-2">
+          {message.username}:{message.text}
         </div>
+      </div>
       ))}
     </div>
 
