@@ -3,6 +3,10 @@ import './App.css'
 
 import { createClient } from '@supabase/supabase-js'
 
+import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
+
 const supabaseUrl = 'https://ihtssavgunaywaeqjthv.supabase.co'
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlodHNzYXZndW5heXdhZXFqdGh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2OTc0MzQ4MDQsImV4cCI6MjAxMzAxMDgwNH0.430HEoSzGqB4RKv2fbboDb6sQTQBMgQNimKKPcxnVTs'
 const supabase = createClient(supabaseUrl, supabaseKey)
@@ -17,6 +21,9 @@ function App() {
 
   const [isTyping, setIsTyping] = useState(false);
   const [payload, setPayload] = useState(null);
+
+  const [selectedFile, setSelectedFile] = useState('null');
+  const [image_url, setImageUrlCatch] = useState();
 
   useEffect(() => {
     getUsername();
@@ -114,14 +121,41 @@ function App() {
   //
 
   // when the user enter message that will go to the supabase
-  const createNewMessage = async (username, text) => {
+  const createNewMessage = async (username, text, selectedFile) => {
 
-    if (text) {
-      await supabase.from("messages").insert({ username, text });
-      setNewMessage('');
-      chnages();
-      getMessages();
+    //console.log(" split : " + extention)
+
+    const { error } = await supabase.storage.from('forfiles/chatdatafiles').upload(selectedFile.name, selectedFile)
+    if (error) {
+      // Handle error
+      console.log("error of file uploading " + error)
+    } else {
+      // Handle success
+      const { data, error } = supabase
+        .storage
+        .from('forfiles/chatdatafiles')
+        .getPublicUrl(selectedFile.name)
+      if (error) {
+        // Handle error
+        console.log("error of getting url " + error)
+      } else {
+
+        const extention = selectedFile.name.split('.').pop();
+        setImageUrlCatch(data.publicUrl)
+
+        if (text) {
+          await supabase.from("messages").insert({ username, text, image_url, extention });
+          setNewMessage('');
+          setSelectedFile('')
+          setImageUrlCatch('')
+          chnages();
+          getMessages();
+        }
+
+      }
     }
+
+
   }
   const catchTheTyping = () => {
     channelRef.current.send({
@@ -130,30 +164,47 @@ function App() {
       payload: { username },
     });
   }
+
   return (
     <>
       <div className="flex flex-col h-screen">
         <div className="flex-1 p-4 overflow-y-auto">
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              className={`mb-4 ${message.username === username ? 'bg-green-200 border border-green-500' : 'bg-gray-200 border border-gray-500'
-                } rounded-lg p-2 max-w-2/3 self-${message.username === username ? 'end' : 'start'
-                }`}
-            >
-              <div className="text-gray-600 m-2">
-                {message.username}:{message.text}
+          {messages.map((message) => {
+            const docs = [{ uri: message.image_url }];
+
+            return (
+              <div
+                key={message.id}
+                className={`mb-4 ${message.username === username
+                    ? 'bg-green-200 border border-green-500'
+                    : 'bg-gray-200 border border-gray-500'
+                  } rounded-lg p-2 max-w-2/3 self-${message.username === username ? 'end' : 'start'
+                  }`}
+              >
+                <div className="text-gray-600 m-2">
+                  username - {message.username} <br />
+                  message - {message.text} <br />
+                  file extension - {message.extention}
+                  <div className="">
+                    <DocViewer documents={docs} pluginRenderers={DocViewerRenderers} />
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <div>
-        {isTyping && (
-          <div className="mb-4 bg-blue-200 border border-blue-500 rounded-lg p-2 max-w-2/3 self-start">
-            <div className="text-gray-600 m-2">Someone is typing...</div>
-          </div>
-        )}
+          {isTyping && (
+            <div className="mb-4 bg-blue-200 border border-blue-500 rounded-lg p-2 max-w-2/3 self-start">
+              <div className="text-gray-600 m-2">Someone is typing...</div>
+            </div>
+          )}
         </div>
+        <input
+          type="file"
+          onChange={(e) => setSelectedFile(e.target.files[0])}
+          className="w-full p-2 rounded-lg border"
+        />
         <input
           type="text"
           placeholder="Type your message..."
@@ -164,7 +215,7 @@ function App() {
           }}
           className="w-full p-2 rounded-lg border"
         />
-        <button onClick={() => createNewMessage(username, newMessage)} className="mt-2 bg-blue-500 text-white rounded-lg p-2">
+        <button onClick={() => createNewMessage(username, newMessage, selectedFile)} className="mt-2 bg-blue-500 text-white rounded-lg p-2">
           Send
         </button>
         <div>
