@@ -23,7 +23,7 @@ function App() {
   const [payload, setPayload] = useState(null);
 
   const [selectedFile, setSelectedFile] = useState('null');
-  const [image_url, setImageUrlCatch] = useState();
+
 
   useEffect(() => {
     getUsername();
@@ -122,41 +122,39 @@ function App() {
 
   // when the user enter message that will go to the supabase
   const createNewMessage = async (username, text, selectedFile) => {
-
-    //console.log(" split : " + extention)
-
-    const { error } = await supabase.storage.from('forfiles/chatdatafiles').upload(selectedFile.name, selectedFile)
+    const { error } = await supabase.storage
+      .from('forfiles/chatdatafiles')
+      .upload(selectedFile.name, selectedFile);
+  
     if (error) {
-      // Handle error
-      console.log("error of file uploading " + error)
+      // Handle the error, e.g., show an error message to the user.
+      console.log("Error uploading file: " + error.message);
     } else {
-      // Handle success
-      const { data, error } = supabase
-        .storage
+      const { data: imageData, error: getImageError } = await supabase.storage
         .from('forfiles/chatdatafiles')
-        .getPublicUrl(selectedFile.name)
-      if (error) {
-        // Handle error
-        console.log("error of getting url " + error)
+        .getPublicUrl(selectedFile.name);
+  
+      if (getImageError) {
+
+        console.log("Error getting image URL: " + getImageError.message);
       } else {
-
+        const image_url = imageData.publicUrl;
         const extention = selectedFile.name.split('.').pop();
-        setImageUrlCatch(data.publicUrl)
-
-        if (text) {
-          await supabase.from("messages").insert({ username, text, image_url, extention });
-          setNewMessage('');
-          setSelectedFile('')
-          setImageUrlCatch('')
-          chnages();
-          getMessages();
-        }
-
+        insertToDatabase(username, text, image_url, extention);
       }
     }
-
-
   }
+
+  
+
+  const insertToDatabase = async (username, text, image_url, extention ) =>{
+    await supabase.from("messages").insert({ username, text, image_url, extention });
+    setNewMessage('');
+    setSelectedFile('')
+    chnages();
+    getMessages();
+  }
+
   const catchTheTyping = () => {
     channelRef.current.send({
       type: 'broadcast',
@@ -185,7 +183,7 @@ function App() {
                   username - {message.username} <br />
                   message - {message.text} <br />
                   file extension - {message.extention}
-                  <div className="">
+                  <div className="w-[300px] h-[300px]">
                     <DocViewer documents={docs} pluginRenderers={DocViewerRenderers} />
                   </div>
                 </div>
