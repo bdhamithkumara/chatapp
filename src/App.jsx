@@ -122,30 +122,39 @@ function App() {
 
   // when the user enter message that will go to the supabase
   const createNewMessage = async (username, text, selectedFile) => {
-    const { error } = await supabase.storage
-      .from('forfiles/chatdatafiles')
-      .upload(selectedFile.name, selectedFile);
+    if (text) {
+      // If no file is selected but there's a message, insert it without an image.
+      insertToDatabase(username, text, null, null);
+    }
+    else if(selectedFile) {
+      // If a file is selected, handle the image upload.
+      const { error } = await supabase.storage
+        .from('forfiles/chatdatafiles')
+        .upload(selectedFile.name, selectedFile);
   
-    if (error) {
-      // Handle the error, e.g., show an error message to the user.
-      console.log("Error uploading file: " + error.message);
-    } else {
+      if (error) {
+        // Handle the error, e.g., show an error message to the user.
+        console.log("Error uploading file: " + error.message);
+        return;
+      }
+  
       const { data: imageData, error: getImageError } = await supabase.storage
         .from('forfiles/chatdatafiles')
         .getPublicUrl(selectedFile.name);
   
       if (getImageError) {
-
+        // Handle the error, e.g., show an error message to the user.
         console.log("Error getting image URL: " + getImageError.message);
-      } else {
-        const image_url = imageData.publicUrl;
-        const extention = selectedFile.name.split('.').pop();
-        insertToDatabase(username, text, image_url, extention);
+        return;
       }
-    }
-  }
+  
+      const image_url = imageData.publicUrl;
+      const extention = selectedFile.name.split('.').pop();
+      insertToDatabase(username, text, image_url, extention);
+    } 
 
   
+  }
 
   const insertToDatabase = async (username, text, image_url, extention ) =>{
     await supabase.from("messages").insert({ username, text, image_url, extention });
@@ -167,29 +176,29 @@ function App() {
     <>
       <div className="flex flex-col h-screen">
         <div className="flex-1 p-4 overflow-y-auto">
-          {messages.map((message) => {
-            const docs = [{ uri: message.image_url }];
-
-            return (
-              <div
-                key={message.id}
-                className={`mb-4 ${message.username === username
-                    ? 'bg-green-200 border border-green-500'
-                    : 'bg-gray-200 border border-gray-500'
-                  } rounded-lg p-2 max-w-2/3 self-${message.username === username ? 'end' : 'start'
-                  }`}
-              >
-                <div className="text-gray-600 m-2">
-                  username - {message.username} <br />
-                  message - {message.text} <br />
-                  file extension - {message.extention}
+        {messages.map((message) => {
+          return (
+            <div
+              key={message.id}
+              className={`mb-4 ${message.username === username
+                  ? 'bg-green-200 border border-green-500'
+                  : 'bg-gray-200 border border-gray-500'
+                } rounded-lg p-2 max-w-2/3 self-${message.username === username ? 'end' : 'start'
+                }`}
+            >
+              <div className="text-gray-600 m-2">
+                username - {message.username} <br />
+                message - {message.text} <br />
+                file extension - {message.extention}
+                {message.image_url && (  // Check if message.image_url is available
                   <div className="w-[300px] h-[300px]">
-                    <DocViewer documents={docs} pluginRenderers={DocViewerRenderers} />
+                    <DocViewer documents={[{ uri: message.image_url }]} pluginRenderers={DocViewerRenderers} />
                   </div>
-                </div>
+                )}
               </div>
-            );
-          })}
+            </div>
+          );
+        })}
         </div>
         <div>
           {isTyping && (
