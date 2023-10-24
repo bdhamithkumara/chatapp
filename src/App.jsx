@@ -24,6 +24,9 @@ function App() {
 
   const [selectedFile, setSelectedFile] = useState('null');
 
+  const [lastMessageTimestamp, setLastMessageTimestamp] = useState(null);
+
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     getUsername();
@@ -67,14 +70,26 @@ function App() {
   }
   //working get the all messages
   const getMessages = async () => {
-    const { data } = await supabase
+
+    const query = supabase
       .from("messages")
       .select()
       .order("timestamp", { ascending: true });
-    console.log(data)
-    setMessages(data)
+
+    if (lastMessageTimestamp) {
+      query.gt("timestamp", lastMessageTimestamp);
+    }
+
+    const { data } = await query;
+
+    if (data.length > 0) {
+      setLastMessageTimestamp(data[data.length - 1].timestamp);
+    }
+
+    setMessages([...messages, ...data]);
+
     return data;
-  }
+  };
 
   //this for realtime
   const chnages = () => {
@@ -85,7 +100,9 @@ function App() {
           { event: '*', schema: 'public', table: 'messages' },
           (payload) => {
             console.log('Change received!', payload)
-            getMessages();
+            if (payload.event === 'INSERT') {
+              getMessages();
+            }
           }
         )
         .subscribe()
@@ -122,44 +139,50 @@ function App() {
 
   // when the user enter message that will go to the supabase
   const createNewMessage = async (username, text, selectedFile) => {
+    
+    setSelectedFile(null); 
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
     if (text) {
-      // If no file is selected but there's a message, insert it without an image.
       insertToDatabase(username, text, null, null);
     }
-    else if(selectedFile) {
+    else if (selectedFile) {
       // If a file is selected, handle the image upload.
       const { error } = await supabase.storage
         .from('forfiles/chatdatafiles')
         .upload(selectedFile.name, selectedFile);
-  
+
       if (error) {
         // Handle the error, e.g., show an error message to the user.
         console.log("Error uploading file: " + error.message);
         return;
       }
-  
+
       const { data: imageData, error: getImageError } = await supabase.storage
         .from('forfiles/chatdatafiles')
         .getPublicUrl(selectedFile.name);
-  
+
       if (getImageError) {
-        // Handle the error, e.g., show an error message to the user.
+
         console.log("Error getting image URL: " + getImageError.message);
         return;
       }
-  
       const image_url = imageData.publicUrl;
       const extention = selectedFile.name.split('.').pop();
       insertToDatabase(username, text, image_url, extention);
-    } 
+    } else if (!text && !selectedFile) {
+      console.log("Please enter a message or choose a file.");
+      return;
+    }
 
-  
-  }
+  };
 
-  const insertToDatabase = async (username, text, image_url, extention ) =>{
+  const insertToDatabase = async (username, text, image_url, extention) => {
     await supabase.from("messages").insert({ username, text, image_url, extention });
+    setSelectedFile(null);
     setNewMessage('');
-    setSelectedFile('')
     chnages();
     getMessages();
   }
@@ -176,29 +199,29 @@ function App() {
     <>
       <div className="flex flex-col h-screen">
         <div className="flex-1 p-4 overflow-y-auto">
-        {messages.map((message) => {
-          return (
-            <div
-              key={message.id}
-              className={`mb-4 ${message.username === username
+          {messages.map((message) => {
+            return (
+              <div
+                key={message.id}
+                className={`mb-4 ${message.username === username
                   ? 'bg-green-200 border border-green-500'
                   : 'bg-gray-200 border border-gray-500'
-                } rounded-lg p-2 max-w-2/3 self-${message.username === username ? 'end' : 'start'
-                }`}
-            >
-              <div className="text-gray-600 m-2">
-                username - {message.username} <br />
-                message - {message.text} <br />
-                file extension - {message.extention}
-                {message.image_url && (  // Check if message.image_url is available
-                  <div className="w-[300px] h-[300px]">
-                    <DocViewer documents={[{ uri: message.image_url }]} pluginRenderers={DocViewerRenderers} />
-                  </div>
-                )}
+                  } rounded-lg p-2 max-w-2/3 self-${message.username === username ? 'end' : 'start'
+                  }`}
+              >
+                <div className="text-gray-600 m-2">
+                  username - {message.username} <br />
+                  message - {message.text} <br />
+                  file extension - {message.extention}
+                  {message.image_url && (  // Check if message.image_url is available
+                    <div className="w-[300px] h-[300px]">
+                      <DocViewer documents={[{ uri: message.image_url }]} pluginRenderers={DocViewerRenderers} />
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
         </div>
         <div>
           {isTyping && (
@@ -209,7 +232,10 @@ function App() {
         </div>
         <input
           type="file"
-          onChange={(e) => setSelectedFile(e.target.files[0])}
+          onChange={(e) => {
+            setSelectedFile(e.target.files[0]);
+          }}
+          ref={fileInputRef}
           className="w-full p-2 rounded-lg border"
         />
         <input
