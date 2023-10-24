@@ -210,6 +210,7 @@ function App() {
                   }`}
               >
                 <div className="text-gray-600 m-2">
+                  timestamp - {message.timestamp} <br />
                   username - {message.username} <br />
                   message - {message.text} <br />
                   file extension - {message.extention}
