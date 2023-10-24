@@ -97,12 +97,12 @@ function App() {
       const message_s = supabase.channel('custom-insert-channel')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'messages' },
+          { event: 'INSERT', schema: 'public', table: 'messages' },
           (payload) => {
             console.log('Change received!', payload)
-            if (payload.event === 'INSERT') {
+            
               getMessages();
-            }
+            
           }
         )
         .subscribe()
@@ -125,16 +125,16 @@ function App() {
   })
 
   // 
-  const channel = supabase.channel('custom-channel')
-  channel
-    .on('presence', { event: 'sync' }, () => {
-      // console.log('Synced presence state: ', channel.presenceState())
-    })
-    .subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await channel.track({ online_at: new Date().toISOString() })
-      }
-    })
+  // const channel = supabase.channel('custom-channel')
+  // channel
+  //   .on('presence', { event: 'sync' }, () => {
+  //     // console.log('Synced presence state: ', channel.presenceState())
+  //   })
+  //   .subscribe(async (status) => {
+  //     if (status === 'SUBSCRIBED') {
+  //       await channel.track({ online_at: new Date().toISOString() })
+  //     }
+  //   })
   //
 
   // when the user enter message that will go to the supabase
@@ -216,7 +216,33 @@ function App() {
                   file extension - {message.extention}
                   {message.image_url && (  // Check if message.image_url is available
                     <div className="w-[300px] h-[300px]">
-                      <DocViewer documents={[{ uri: message.image_url }]} pluginRenderers={DocViewerRenderers} />
+                      <DocViewer documents={[{ uri: message.image_url }]} pluginRenderers={DocViewerRenderers} 
+                      config={{
+                        header: {
+                          disableHeader: false,
+                          disableFileName: false,
+                          retainURLParams: false,
+                        },
+                        csvDelimiter: ",", // "," as default,
+                        pdfZoom: {
+                          defaultZoom: 1.1, // 1 as default,
+                          zoomJump: 0.2, // 0.1 as default,
+                        },
+                        pdfVerticalScrollByDefault: true, // false as default
+                        loadingRenderer: {
+                          showLoadingTimeout: false, // false if you want to disable or number to provide your own value (ms)
+                        },
+                      }}
+                      theme={{
+                        primary: "#5296d8",
+                        secondary: "#ffffff",
+                        tertiary: "#5296d899",
+                        textPrimary: "#ffffff",
+                        textSecondary: "#5296d8",
+                        textTertiary: "#00000099",
+                        disableThemeScrollbar: false,
+                      }}
+                      />
                     </div>
                   )}
                 </div>
